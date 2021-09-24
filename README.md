@@ -6,6 +6,8 @@ Universidade Federal Fluminense
 
 - Data de entrega: 24/09/2021
 
+Alunos: Iago Agualuza e Diego Cacau
+
 ## Objetivo
 
 Estender a linguagem Fun e seu interpretador com suporte a definição
