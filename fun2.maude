@@ -5,7 +5,7 @@ fmod FUN-LEX is
      inc LEXICAL .
      inc BASIC-LEX .
 
-     eq keywords = ('fun '`( '`) '= '`, '~ '+ '- '* '/ '>= '> '<= '< '== 'or 'and 'if 'then 'else) .
+     eq keywords = ('fun '`( '`) '= '`, '~ '+ '- '* '/ '>= '> '<= '< '== 'or 'and 'if 'then 'else '::) .
      eq ignore = nil .
 
      var Q : Qid .
@@ -30,14 +30,37 @@ fmod FUN-LEX is
      eq mkIdn(Q) = tokenize("idn('" + printTokens(Q) + ")") .
 endfm
 
+fmod MYLIST is
+     inc QID .
+
+     sorts MyList .
+     sorts Expr Idn Val .
+     subsort Idn Val < Expr < MyList .
+     op nilMyList : -> MyList .
+     op _::_ : MyList MyList -> MyList [assoc id: nilMyList] .
+     op ifirst : MyList -> Idn .
+     op itail : MyList -> MyList .
+     op efirst : MyList -> Expr .
+     op etail : MyList -> MyList .
+
+     var tail : MyList .
+     var firstIdn : Idn .
+     var firstExpr : Expr .
+
+     eq ifirst(firstIdn :: tail) = firstIdn .
+     eq itail(firstIdn :: tail) = tail .
+     eq efirst(firstExpr :: tail) = firstExpr .
+     eq etail(firstExpr :: tail) = tail .
+endfm
+
 fmod FUN-GRM is
      inc QID .
      inc RAT .
      inc FLOAT .
      inc STRING .
      inc BOOL .
-     sorts Expr Idn Val .
-     subsort Idn Val < Expr .  
+     inc MYLIST .
+     subsort Idn Val < Expr < MyList .  
      op idn : Qid -> Idn .
      op rat : Rat -> Val .
      op flo : Float -> Val .
@@ -46,8 +69,8 @@ fmod FUN-GRM is
      ops _+_ _*_ _-_ _/_ _==_ _<_ _<=_ _>_ _>=_ _or_ _and_ : Expr Expr -> Expr [gather(E e) prec 20] .
      op ~_ : Expr -> Expr .
      op if_then_else_ : Expr Expr Expr -> Expr [prec 40] .
-     op fun_(_) =_ : Idn Idn Expr -> Expr [prec 50] .
-     op _(_) : Idn Expr -> Expr [prec 10] . 
+     op fun_(_) =_ : Idn MyList Expr -> Expr [prec 50] .
+     op _(_) : Idn MyList -> Expr [prec 10] . 
      op _,_ : Expr Expr -> Expr [prec 60 assoc] .
  endfm 
 
@@ -80,6 +103,13 @@ fmod FUN-TRAN2 is
      vars E E1 E2 E3 : Expr .
      var I I1 I2 : Idn . 
 
+
+     var L : MyList .
+     op compileIList : MyList -> Formals .
+     eq compileIList(L) = if itail(L) == nilMyList then compileIdn(ifirst(L)) else compileIdn(ifirst(L)) compileIList(itail(L)) fi .
+     op compileEList : MyList -> Actuals .
+     eq compileEList(L) = if etail(L) == nilMyList then compileExpr(efirst(L)) else compileExpr(efirst(L)) compileEList(etail(L)) fi .
+
      eq compileExpr(rat(R)) = exp(val(R)) .
      eq compileExpr(flo(F)) = exp(val(F)) .
      eq compileExpr(str(S)) = exp(val(S)) .
@@ -102,16 +132,17 @@ fmod FUN-TRAN2 is
      eq compileExpr(if E1 then E2 else E3) = 
         ite(compileExpr(E1), compileExpr(E2), compileExpr(E3)) .
 
-     eq compileExpr(fun I1 (I2) = E) = compileDec(fun I1 (I2) = E) .
+     eq compileExpr(fun I1 (L) = E) = compileDec(fun I1 (L) = E) .
 
-     eq compileExpr(I(E)) = recapp(compileIdn(I), compileExpr(E)) .
+     eq compileExpr(I(L)) = recapp(compileIdn(I), compileEList(L)) .
 
-     eq compileExpr((fun I1 (I2) = E1, E2)) = 
-        let(compileDec(fun I1 (I2) = E1), compileExpr(E2)) .
+     eq compileExpr((fun I1 (L) = E1, E2)) = 
+        let(compileDec(fun I1 (L) = E1), compileExpr(E2)) .
+
 
      op compileDec : Expr -> Dec .
      eq compileDec(fun I1 (I2) = E) = 
-        rec(compileIdn(I1), lambda(compileIdn(I2), compileExpr(E))) . 
+        rec(compileIdn(I1), lambda(compileIList(I2), compileExpr(E))) . 
 endfm
 
 fmod FUN-RUN-TIME is 
